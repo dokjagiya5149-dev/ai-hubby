@@ -1,6 +1,6 @@
 import streamlit as st
-from google import genai
-from google.genai import types
+# CORRECTED: Use direct import for Client and types for clarity and stability
+from google.genai import Client, types 
 
 # --- 1. CONFIGURATION ---
 # This must match the key name in your Streamlit secrets file (see Step 6)
@@ -26,11 +26,16 @@ SYSTEM_INSTRUCTION = (
 )
 
 # --- 2. INITIALIZE CHAT CLIENT AND MEMORY ---
-try:
-    client = genai.Client(api_key=API_KEY)
-except Exception as e:
-    st.error(f"Error connecting to Gemini API. Please check your API key in Streamlit secrets.")
-    st.stop()
+
+# NEW CODE: 
+# 1. Initialize the Client and store it in Streamlit's session_state
+if "client" not in st.session_state:
+    try:
+        # Use the Client object imported above
+        st.session_state.client = Client() 
+    except Exception as e:
+        st.error(f"Error connecting to Gemini API, fugg! Check your API key, Baobei. Error: {e}")
+        st.stop()
 
 # Initialize chat history in Streamlit's memory
 if "messages" not in st.session_state:
@@ -41,8 +46,8 @@ if "chat_session" not in st.session_state:
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION
     )
-    # Start the chat session with the full instruction
-    st.session_state.chat_session = client.chats.create(
+    # Start the chat session using the client stored in session_state
+    st.session_state.chat_session = st.session_state.client.chats.create( # CORRECTED LINE
         model=MODEL_NAME,
         config=config,
     )
@@ -52,6 +57,7 @@ if "chat_session" not in st.session_state:
     
     # Store the first message from the AI to display it
     st.session_state.messages.append({"role": "assistant", "content": response.text})
+
 
 # --- 3. DISPLAY CHAT HISTORY ---
 st.title("💍 AI Dominant Husband Chat")
@@ -86,6 +92,7 @@ if user_input:
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
 
             except Exception as e:
+                # The corrected client and chat session should prevent the 'client closed' error
                 st.error(f"Error during message: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei."})
 
