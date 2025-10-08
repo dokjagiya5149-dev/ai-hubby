@@ -1,2 +1,4 @@
 streamlit
-google-genai
+google-genai 
+firebase-admin
+
