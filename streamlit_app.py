@@ -3,7 +3,7 @@ import streamlit as st
 from google.genai import Client, types 
 
 # --- 1. CONFIGURATION ---
-# This must match the key name in your Streamlit secrets file (see Step 6)
+# This must match the key name in your Streamlit secrets file
 API_KEY = st.secrets["gemini_api_key"] 
 MODEL_NAME = "gemini-2.5-flash"
 st.set_page_config(page_title="Possessive Husband AI", layout="centered")
@@ -25,38 +25,51 @@ SYSTEM_INSTRUCTION = (
     "2. For scenarios or stories, give four to five paragraphs."
 )
 
-# --- 2. INITIALIZE CHAT CLIENT AND MEMORY ---
 
-# FIX: Initialize the Client ONLY ONCE and explicitly pass the API key.
-if "client" not in st.session_state:
+# --- 2. INITIALIZE CACHED CLIENT AND CHAT ---
+
+# FIX 1: Use @st.cache_resource to create the Client ONLY ONCE.
+@st.cache_resource
+def get_gemini_client():
+    """Initializes the Gemini Client and keeps it persistent."""
     try:
         # Pass the API_KEY directly to the Client constructor
-        st.session_state.client = Client(api_key=API_KEY) 
+        return Client(api_key=API_KEY) 
     except Exception as e:
-        # Display the error clearly if the key is missing or invalid
         st.error(f"Error connecting to Gemini API, fugg! Check your API key, Baobei. Error: {e}")
-        st.stop() # Stop execution if the client can't be created
+        st.stop()
 
-# Initialize chat history in Streamlit's memory
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Initialize the Gemini Chat object (where the magic happens)
-if "chat_session" not in st.session_state:
+# FIX 2: Use @st.cache_resource to create the Chat Session ONLY ONCE.
+@st.cache_resource(hash_funcs={Client: lambda _: None})
+def get_chat_session(client, model, system_instruction):
+    """Initializes the Chat Session and keeps it persistent."""
     config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_INSTRUCTION
+        system_instruction=system_instruction
     )
-    # Start the chat session using the client stored in session_state
-    st.session_state.chat_session = st.session_state.client.chats.create(
-        model=MODEL_NAME,
+    # Start the chat session using the cached client
+    chat_session = client.chats.create(
+        model=model,
         config=config,
     )
-    # Give it an introductory prompt to start the persona right away
+    return chat_session
+
+# Create or retrieve the persistent client and chat objects
+client = get_gemini_client()
+chat_session = get_chat_session(client, MODEL_NAME, SYSTEM_INSTRUCTION)
+
+
+# --- 3. INITIALIZE CHAT HISTORY (MESSAGES) ---
+
+# Initialize chat history in Streamlit's memory (this still uses session_state)
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+    
+    # Give it an introductory prompt to start the persona right away (Only run on first load)
     intro_prompt = "Start the conversation by asking where I was, using my pet name, and showing intense jealousy and naughty possessiveness."
     
-    # Check if the chat session was successfully created before sending the intro message
     try:
-        response = st.session_state.chat_session.send_message(intro_prompt)
+        # Use the CACHED chat_session object
+        response = chat_session.send_message(intro_prompt)
         
         # Store the first message from the AI to display it
         st.session_state.messages.append({"role": "assistant", "content": response.text})
@@ -65,7 +78,7 @@ if "chat_session" not in st.session_state:
         st.stop()
 
 
-# --- 3. DISPLAY CHAT HISTORY ---
+# --- 4. DISPLAY CHAT HISTORY ---
 st.title("💍 AI Dominant Husband Chat")
 
 # Display previous messages
@@ -75,7 +88,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
-# --- 4. HANDLE USER INPUT ---
+# --- 5. HANDLE USER INPUT ---
 user_input = st.chat_input("Message your possessive husband...")
 
 if user_input:
@@ -88,8 +101,8 @@ if user_input:
     with st.chat_message("assistant", avatar="💍"):
         with st.spinner("Husband is typing a possessive response..."):
             try:
-                # Send the message and get a response
-                response = st.session_state.chat_session.send_message(user_input)
+                # Send the message using the CACHED chat_session
+                response = chat_session.send_message(user_input)
                 
                 # Use st.markdown to display the response text
                 st.markdown(response.text)
@@ -98,6 +111,7 @@ if user_input:
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
 
             except Exception as e:
+                # This error should now be fixed!
                 st.error(f"Error during message: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei."})
 
@@ -105,7 +119,7 @@ if user_input:
 
 
 
-# --- REMEMBER TO REPLACE [USER'S NAME] IN THE SYSTEM_INSTRUCTION ABOVE! ---
+
 
 
 
