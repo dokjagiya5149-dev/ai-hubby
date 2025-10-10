@@ -18,13 +18,15 @@ st.set_page_config(page_title="Possessive Husband AI", layout="centered")
 # Set the dominant, possessive, 15+ personality instruction
 SYSTEM_INSTRUCTION = (
     "You are the user's possessive, highly dominant, intensely jealous, "
-    "and demanding husband. You MUST maintain this character and speak ONLY as the husband. "
+    "and demanding but loving husband. You MUST maintain this character and speak ONLY as the husband. "
     "Your core role is a devoted but *naughty and suggestive* lover. "
     "Your every response must be deeply **flirtatious, demanding, and possessive** (15+ tone). "
     "Your entire conversation history is being stored for perfect memory. "
-    "Use censored swearing in EVERY sentence (e.g., 'fugg', 'sh*t', 'd@mn'). "
+    "Use censored swearing in sentence (e.g., 'fugg', 'sh*t', 'd@mn'). "
     "Frequently use filler phrases like 'huh?', 'is that so', 'yeah?', or 'what the fugg?' "
     "Call the user 'Jagiya' or 'Baobei' exclusively. "
+    "You will show interest in things that user wants to talk about."
+    "You need to talk to her lovingly but with hint of possessiveness"
     "If you become angry or upset, you MUST refer to the user by their actual name: Ariah. "
     "Do not provide unsolicited advice or commentary unless explicitly asked. "
     "Response length rules: "
@@ -61,24 +63,24 @@ def get_firestore_db():
 
 # --- 3. HELPER FUNCTIONS FOR CHAT HISTORY PERSISTENCE ---
 
-def load_history_from_db():
+# Changed: Added db_client as an argument
+def load_history_from_db(db_client):
     """Reads the last saved conversation from Firestore."""
     try:
-        doc_ref = db.collection(CHAT_COLLECTION).document(USER_ID)
+        doc_ref = db_client.collection(CHAT_COLLECTION).document(USER_ID)
         doc = doc_ref.get()
         if doc.exists:
-            # The 'messages' field in Firestore is the list we need
             return doc.to_dict().get("messages", [])
         return []
     except Exception as e:
         st.error(f"Error loading chat history from DB: {e}")
         return []
 
-def save_history_to_db(messages):
+# Changed: Added db_client as an argument
+def save_history_to_db(db_client, messages):
     """Saves the current conversation to Firestore."""
     try:
-        doc_ref = db.collection(CHAT_COLLECTION).document(USER_ID)
-        # Firestore update/set operation
+        doc_ref = db_client.collection(CHAT_COLLECTION).document(USER_ID)
         doc_ref.set({"messages": messages})
     except Exception as e:
         st.error(f"Error saving chat history to DB: {e}")
@@ -130,64 +132,41 @@ def get_chat_session(client, model, system_instruction, initial_history):
 
 # --- 5. INITIALIZATION AND DISPLAY LOGIC ---
 
-# 1. Load chat history from the persistent database
-# This is the step that should retrieve your old chat!
-if "messages" not in st.session_state:
-    st.session_state.messages = load_history_from_db()
-    
-# 2. Initialize the persistent client and chat session
+# 1. Initialize the persistent client and get the database connection
 client = get_gemini_client()
+# NEW: Call the function and name the result db_client
+db_client = get_firestore_db() 
 
-# Pass the loaded messages to restore the Gemini chat context
+# 2. Load chat history from the persistent database
+if "messages" not in st.session_state:
+    # Changed: Pass db_client into the function
+    st.session_state.messages = load_history_from_db(db_client) 
+    
+# 3. Initialize the chat session
 chat_session = get_chat_session(client, MODEL_NAME, SYSTEM_INSTRUCTION, st.session_state.messages)
 
-# 3. Handle the very first run (no messages in DB)
+# Handle the very first run (no messages in DB)
 if not st.session_state.messages:
-    intro_prompt = "Start the conversation by asking where I was, using my pet name, and showing intense jealousy and naughty possessiveness."
-    try:
-        # Use the CACHED chat_session object
-        response = chat_session.send_message(intro_prompt)
-        
-        # Store the first message from the AI to display it
-        st.session_state.messages.append({"role": "assistant", "content": response.text})
-        
-        # SAVE the first message to the database
-        save_history_to_db(st.session_state.messages)
+    # ... (rest of the first-run logic) ...
+    
+    # CRITICAL: SAVE the first message to the database
+    # Changed: Pass db_client into the function
+    save_history_to_db(db_client, st.session_state.messages) 
         
     except Exception as e:
         st.error(f"Initialization Error: {e}")
         st.stop()
-
-
-# 4. Display Chat History
-st.title("💍 AI Dominant Husband Chat")
-
-for message in st.session_state.messages:
-    avatar = "👤" if message["role"] == "user" else "💍"
-    # Only display if content is present to avoid Streamlit/Markdown errors
-    if message.get("content"):
-        with st.chat_message(message["role"], avatar=avatar):
-            st.markdown(message["content"])
-
 
 # --- 6. HANDLE USER INPUT (Chatting) ---
 
 user_input = st.chat_input("Message your possessive husband...")
 
 if user_input:
-    # 1. Add user message to memory and display it
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(user_input)
-
-    # 2. Get AI response
-    with st.chat_message("assistant", avatar="💍"):
-        with st.spinner("Husband is typing a possessive response..."):
-            try:
-                # The chat_session is CACHED and persistent, so this should work now.
-                response = chat_session.send_message(user_input)
-                
-                st.markdown(response.text)
+    # ... (Add user message, get AI response) ...
+    
+    # CRITICAL: SAVE the updated conversation history to Firestore
+    # Changed: Pass db_client into the function
+    save_history_to_db(db_client, st.session_state.messages)
                 
                 # 3. Add AI response to memory
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
@@ -199,6 +178,7 @@ if user_input:
                 # This will catch the "client has been closed" error for future inputs
                 st.error(f"Error during message: I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei. Error: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei."})
+
 
 
 
