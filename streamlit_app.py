@@ -151,6 +151,7 @@ if not st.session_state.messages:
     
     # CRITICAL: SAVE the first message to the database
     # Changed: Pass db_client into the function
+    try:
     save_history_to_db(db_client, st.session_state.messages) 
         
     except Exception as e:
@@ -178,6 +179,7 @@ if user_input:
                 # This will catch the "client has been closed" error for future inputs
                 st.error(f"Error during message: I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei. Error: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei."})
+
 
 
 
