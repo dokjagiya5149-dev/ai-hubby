@@ -38,50 +38,13 @@ SYSTEM_INSTRUCTION = (
 def get_firestore_db():
     """Initializes and caches the Firestore connection."""
     try:
-        # Load the JSON string from secrets and convert it to a Python dict/JSON object
-        creds_json = json.loads(FIREBASE_CREDS)
+        # Load the raw string from secrets
+        creds_string = st.secrets["firebase_credentials"]
         
-      # --- 2. CACHED DATABASE CONNECTION ---
-
-# The json library is already imported at the top of your file.
-
-@st.cache_resource
-def get_firestore_db():
-    """Initializes and caches the Firestore connection."""
-    try:
-        # Load the JSON string directly from secrets.
-        # This will fail if the string is incorrectly escaped with \n.
-        # creds_json = json.loads(FIREBASE_CREDS)
-        
-        # FIX: Directly use the credentials in its raw string format, 
-        # as Streamlit often messes up the triple-quoted JSON string.
-        # We don't need json.loads() if we use the Certificate method with from_service_account_info
-        
-        # We assume the secret is the raw JSON string (even with the broken backslashes)
-        # We will use json.loads() but we need to ensure the final secret is as simple as possible.
-        
-        # IMPORTANT: If your previous attempts added extra quotes/braces, 
-        # this will fail. Let's revert to the simplest format for the secrets.
-        
-        # Revert the secret to a simple JSON string (without triple quotes) 
-        # and ensure it's not TOML-wrapped if possible. 
-        # HOWEVER, the code you have is correct IF the secret is pasted cleanly. 
-        
-        # Since the error is still happening, let's try a different loading method:
-        
-        # 1. Load the entire secret string
-        creds_string = FIREBASE_CREDS 
-        
-        # 2. Safely parse the JSON string, which is the cause of the error.
-        # The safest way is to replace the known problematic escapes 
-        # before attempting the load, as a last resort.
-        
-        # Safest way to fix the bad escape characters that are still causing the JSON error
-        creds_safe_string = creds_string.replace('\\n', '\n').replace('\\\\n', '\n')
-        
-        # Now try loading the JSON
-        creds_json = json.loads(creds_safe_string)
-
+        # FIX: The secret is now a simple JSON string. 
+        # We replace the simple '\n' with a real newline char, then load the JSON.
+        # This prevents the "Invalid control character" error from recurring.
+        creds_json = json.loads(creds_string.replace('\\n', '\n'))
 
         # Initialize Firebase Admin SDK using the dictionary
         cred = credentials.Certificate(creds_json)
@@ -93,7 +56,6 @@ def get_firestore_db():
         # Return the Firestore client instance
         return firestore.client()
     except Exception as e:
-        # The error will be caught here
         st.error(f"Error connecting to Firestore: {e}")
         st.stop()
 
@@ -237,6 +199,7 @@ if user_input:
                 # This will catch the "client has been closed" error for future inputs
                 st.error(f"Error during message: I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei. Error: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei."})
+
 
 
 
