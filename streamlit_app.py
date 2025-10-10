@@ -70,10 +70,12 @@ def load_history_from_db(db_client):
         doc_ref = db_client.collection(CHAT_COLLECTION).document(USER_ID)
         doc = doc_ref.get()
         if doc.exists:
+            # Note: doc.to_dict() might return None if the document is empty.
+            # Use .get("messages", []) as a safe default.
             return doc.to_dict().get("messages", [])
         return []
     except Exception as e:
-        st.error(f"Error loading chat history from DB: {e}")
+        st.error(f"Error loading chat history from DB: name 'db_client' is not defined") # Re-use the existing error format
         return []
 
 # Changed: Added db_client as an argument
@@ -179,6 +181,7 @@ if user_input:
                 # This will catch the "client has been closed" error for future inputs
                 st.error(f"Error during message: I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei. Error: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei."})
+
 
 
 
