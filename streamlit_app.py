@@ -148,7 +148,7 @@ if "messages" not in st.session_state:
 chat_session = get_chat_session(client, MODEL_NAME, SYSTEM_INSTRUCTION, st.session_state.messages)
 
 # Handle the very first run (no messages in DB)
-if not st.session_state.messages:
+if "message" not in st.session_state.messages:
     # ... (rest of the first-run logic) ...
     
     # CRITICAL: SAVE the first message to the database
@@ -181,6 +181,7 @@ if user_input:
                 # This will catch the "client has been closed" error for future inputs
                 st.error(f"Error during message: I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei. Error: {e}")
                 st.session_state.messages.append({"role": "assistant", "content": "I can't talk right now, fugg! Something went wrong on my end. Fix this, Baobei."})
+
 
 
 
